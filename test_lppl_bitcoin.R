@@ -2,7 +2,7 @@
 library('quantmod')
 library('zoo')
 
-setwd('/Users/gregorychevalley/Documents/R/bitcoin/')
+setwd('C:/Users/Gregory Chevalley/RStudio/lppl_bitcoin/')
 
 # delete all we have done until now
 rm(list=ls())
@@ -16,10 +16,8 @@ ticker <- read.csv(fileName, header=TRUE)
 # convert string dates to R dates
 ticker$Date <- as.Date(ticker$Date)
 
-from <- as.Date("2013-01-01")
-#from <- as.Date("2011-06-08")
-to <- as.Date("2013-04-11")
-#to <- as.Date("2011-11-21")
+from <- as.Date("2011-11-16")
+to <- as.Date("2013-11-18")
 
 # restrict ticker between interest days: Jan 1 and Apr 11
 rTicker <- subset(ticker, ticker$Date >= from & ticker$Date <= to)
@@ -51,13 +49,20 @@ FittedLPPL <- function(data, lm.result, m=1, omega=1, phi=0) {
   return(result)
 }
 
-lines(FittedLPPL(rTicker, lm.result), col="red")
+
+get_FittedLPPL_estimators <- function(data, m, omega, phi) {
+  lm.result <- LPPL(data, m, omega, phi)
+  return(c(lm.result$coefficients[1], lm.result$coefficients[2], lm.result$coefficients[3]))
+}
+
+
+#lines(FittedLPPL(rTicker, lm.result), col="red")
 
 # plot everything 
 tryParams <- function (m, omega, phi) {  
   lm.result <- LPPL(rTicker, m, omega, phi)
   plot(rTicker$Close, typ='l')
-  lines(FittedLPPL(rTicker, lm.result, m, omega, phi), col="red")
+  lines(FittedLPPL(rTicker, lm.result, m, omega, phi), col="blue")
 }
 
 # the sum of squared residuals, to evaluate the fitness of m, omega, phi
@@ -65,6 +70,13 @@ residuals <- function(m, omega, phi) {
   lm.result <- LPPL(rTicker, m, omega, phi)
   return(sum((FittedLPPL(rTicker, lm.result, m, omega, phi) - rTicker$Close) ** 2))
 }
+
+
+computeB <- function(A, B, C, m, omega, phi) {
+  return(B * m - abs(C) * sqrt(m ** 2 + omega ** 2))
+}
+
+
 
 # some values of the parameters
 m <- seq(0.005, 0.015, 0.001)
@@ -79,9 +91,19 @@ app <- apply(params, 1, function (x) { residuals(x[1], x[2], x[3]) })
 wm <- which.min(app)
 print(app[wm])
 print(params[wm, 1:3])
-tryParams(params[wm, 1], params[wm, 2], params[wm, 3])
 
-computeB <- function(A, B, C, m, omega, phi) {
-  return(B * m - abs(C) * sqrt(m ** 2 + omega ** 2))
-}
+m <- params[wm, 1]
+omega <- params[wm, 2]
+phi <- params[wm, 3]
 
+tryParams(params[wm, 1], params[wm, 2], params[wm, 3]) #last call for chart
+
+
+estimatorsABC <- get_FittedLPPL_estimators(rTicker, m, omega, phi)
+
+A <- estimatorsABC[1]
+B <- estimatorsABC[2]
+C <- estimatorsABC[3]
+
+#compute bubble
+print(computeB(A, B, C, m, omega, phi))
